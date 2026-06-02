@@ -165,6 +165,14 @@ p-value (blank where skipped for runtime); `gates` = how many of the 5 anti-over
 | 1w | 1.1k | 65 | 1.9% | 0.44 | −17% | 0.32 | 0.02% | 0.43 | 0.08 (0.54) | 0.588 | 0.154 | 1/5 |
 | 1mo | 260 | 55 | 1.2% | 0.56 | −6% | 0.15 | 0.01% | 0.55 | 0.43 (0.52) | 0.949 | 0.030 | 2/5 |
 
+The headline chart, but for **all nine timeframes at once** (each at `r = 5%`, daily-sampled, log
+scale). Only **4h** (amber) pulls clearly above buy-&-hold gold (black); the fast timeframes are
+dragged flat along the bottom by cost, and the slow ones barely lever up. One strategy, nine speeds —
+almost the entire spread between them is a cost-and-sample-size story, which the rest of this section
+unpacks.
+
+![Strategy equity for every timeframe vs gold](results/plots/equity_all_timeframes_vs_gold.png)
+
 ![Cost decay by timeframe](results/plots/cost_decay_by_timeframe.png)
 
 ### How costs "kill" the fast timeframes
@@ -176,6 +184,14 @@ fees. Why does turnover (and therefore cost) explode on fast bars even though th
 same number of days? Because the **trailing stop whipsaws**: on 1-minute bars the 5×ATR stop is hit
 and re-entered far more often within the *same* trend (2151 trades vs 112 on 4h), and every one of
 those round-trips pays the spread. Faster ≠ more edge; faster = **more friction**.
+
+![Trade count by timeframe — two ways to die](results/plots/trades_by_timeframe.png)
+
+This is the whole study in one chart — **two ways to die.** Trade count *explodes* toward fast bars
+(2151 at 1m, almost all of it trailing-stop whipsaw *within* the same trend) and *starves* toward
+slow ones (55 at monthly). The fast end pays that turnover away in spread; the slow end runs out of
+statistical evidence (next subsection). 4h (amber) lands where there are enough trades to mean
+something, yet few enough that cost stays a rounding error.
 
 And remember costs here are modelled at a *nominal* tight spread. Real intraday gold spreads in thin
 hours are wider, and **overnight financing is not charged at all** — both of which would punish the
@@ -200,6 +216,22 @@ costs are still a rounding error (0.29% drag; survives 3× cost with Sharpe 0.86
 sentence: **the right timeframe is the one where your edge is real *and* your costs are still
 negligible — and for leveraged gold trend, that's 4 hours.**
 
+![Risk vs return by timeframe](results/plots/risk_return_by_timeframe.png)
+
+Plotting every timeframe by return (x) against risk-adjusted return (y) — bubble size = number of
+trades, colour = anti-overfit gates passed — makes the sweet spot visually obvious: **4h sits alone
+in the top-right, dark green (5/5 gates).** The huge orange 1m bubble (most trades, lowest Sharpe, a
+single gate) is the cost cliff in one dot, and the small bubbles hugging the buy-&-hold line are the
+trade-starved slow timeframes.
+
+![Max drawdown by timeframe](results/plots/maxdd_by_timeframe.png)
+
+Drawdown tells the same story from the risk side: it is worst exactly where the leverage cap binds
+hardest (full-sample −47% at 1m, −41% at 30m), while 4h's −26% is among the mildest of the
+*leveraged* timeframes. The blue bars are the walk-forward out-of-sample drawdowns — and **every**
+timeframe clears the "OOS drawdown ≤ buy-&-hold gold" gate, because that ceiling is a hard constraint
+baked into the parameter selection, never a quantity we maximize.
+
 ---
 
 ## Methodology — why we believe it
@@ -221,6 +253,14 @@ are selected only on training data):
    structure), rebuild a synthetic price path, and re-run thousands of times. PASS if the real
    ordering's Sharpe beats the random ones with p < 0.05 — i.e. the edge comes from *trend*, not from
    curve-fitting.
+
+![Anti-overfit gates by timeframe](results/plots/gates_heatmap.png)
+
+Running all five gates across all nine timeframes makes the verdict unambiguous — **only 4h is green
+on every gate.** The fast timeframes (1m–15m) fail the cost-stress gate (1m fails most of them); the
+slow ones (1d–1mo) fail walk-forward and deflated-Sharpe for lack of trades. MCPT is marked *n/a* on
+the three fastest bars, where the permutation test is too expensive to run (the other columns already
+condemn them).
 
 We also built three variants and let the backtest pick (rather than arguing from authority):
 **(A)** the breakout + trailing-stop system above; **(B)** a continuous volatility-targeted EWMAC
@@ -266,7 +306,7 @@ python -m leveraged_gold_trend --plots                  # regenerate the charts
 ```
 
 The precomputed evidence is committed under [`results/`](results/) (the 9-timeframe table, the
-headline metrics JSON, and the two charts), so you can read the whole study without downloading
+headline metrics JSON, and all seven charts), so you can read the whole study without downloading
 anything or re-running the heavy 1-minute pass (which takes a couple of minutes).
 
 **Data:** Kaggle `novandraanugrah/xauusd-gold-price-historical-data-2004-2024`. Not redistributed

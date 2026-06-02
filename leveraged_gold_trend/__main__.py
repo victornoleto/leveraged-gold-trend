@@ -66,6 +66,10 @@ def main() -> None:
         from .timeframe_scan import RESULTS, scan
         csv = RESULTS / "timeframe_scan.csv"
         t = pd.read_csv(csv) if csv.exists() else scan(save=True, verbose=False)
+        # the gate heatmap needs the per-gate columns; re-scan once if the CSV predates them
+        if not set(plots.GATE_COLS).issubset(t.columns):
+            print("scan CSV missing per-gate columns; re-running scan ...")
+            t = scan(save=True, verbose=False)
         # headline metrics JSON (evidence for the README)
         p = validate.ppy("4h")
         m = metrics.from_equity(validate.equity_for("4h", {"risk_pct_per_trade": HEADLINE_RISK}), p)
@@ -76,7 +80,12 @@ def main() -> None:
             json.dumps({**{k: round(v, 4) for k, v in m.items()}, **ts}, indent=2), encoding="utf-8")
         print("wrote", RESULTS / "headline_4h_metrics.json")
         print("wrote", plots.equity_vs_gold("4h"))
+        print("wrote", plots.equity_all_timeframes())
         print("wrote", plots.cost_decay(t))
+        print("wrote", plots.risk_return_by_timeframe(t))
+        print("wrote", plots.gates_heatmap(t))
+        print("wrote", plots.trades_by_timeframe(t))
+        print("wrote", plots.maxdd_by_timeframe(t))
     else:
         _headline(args.interval, run_gates=args.validate)
 

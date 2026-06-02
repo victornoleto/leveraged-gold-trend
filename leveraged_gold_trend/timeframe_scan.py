@@ -27,7 +27,9 @@ MCPT_N = {"1m": 0, "5m": 0, "15m": 0, "30m": 60, "1h": 100, "4h": 150, "1d": 200
 
 COLUMNS = ["tf", "bars", "n_trades", "full_cagr_pct", "full_sharpe", "full_maxdd_pct", "avg_lev",
            "cost_drag_pct", "cost3_sharpe", "wf_oos_sharpe", "bh_oos_sharpe", "wf_oos_maxdd_pct",
-           "dsr", "mcpt_p", "gates"]
+           "dsr", "mcpt_p", "gates",
+           # the 5 individual gate verdicts (so the heatmap plot is honest without re-running gates)
+           "gate_wf", "gate_dd", "gate_dsr", "gate_cost3", "gate_mcpt"]
 
 
 def scan(intervals=data.INTERVALS, save: bool = True, verbose: bool = True) -> pd.DataFrame:
@@ -63,6 +65,11 @@ def scan(intervals=data.INTERVALS, save: bool = True, verbose: bool = True) -> p
             "dsr": round(g["dsr"], 3),
             "mcpt_p": round(g["mcpt"]["p_value"], 3),
             "gates": f"{g['n_pass']}/5",
+            "gate_wf": g["checks"]["wf_beats_bh"],
+            "gate_dd": g["checks"]["oos_dd_le_bh"],
+            "gate_dsr": g["checks"]["dsr_gt_0p95"],
+            "gate_cost3": g["checks"]["cost3_beats_bh"],
+            "gate_mcpt": g["checks"]["mcpt_p_lt_0p05"],
         })
 
     table = pd.DataFrame(rows)[COLUMNS]
