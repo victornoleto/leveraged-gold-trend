@@ -1,4 +1,4 @@
-"""Run the SAME strategy (Approach A) across all 9 timeframes and tabulate the result.
+"""Run the SAME promoted strategy across all 9 timeframes and tabulate the result.
 
 This is the study at the heart of the repo: with lookbacks fixed in *days* (so it is genuinely the
 same strategy), how does behaviour change from 1m to 1mo — and where do trading costs make the edge
@@ -77,7 +77,7 @@ def scan(intervals=data.INTERVALS, save: bool = True, verbose: bool = True) -> p
         RESULTS.mkdir(parents=True, exist_ok=True)
         table.to_csv(RESULTS / "timeframe_scan.csv", index=False)
     if verbose:
-        print("\n=== TIMEFRAME SCAN — Approach A (risk 5%, cap 3×), XAUUSD, fx costs ===")
+        print("\n=== TIMEFRAME SCAN — promoted strategy (risk 5%, cap 3×), XAUUSD, fx costs ===")
         print("full-sample vs walk-forward OOS; 24h-gold (empirical) annualization\n")
         print(table.to_string(index=False))
         passed = [r["tf"] for r in rows if r["gates"] == "5/5"]

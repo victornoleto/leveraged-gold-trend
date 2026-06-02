@@ -1,11 +1,12 @@
-"""Anti-overfitting validation for the gold trend strategy (Approach A).
+"""Anti-overfitting validation for the promoted gold trend strategy.
 
 Five gates a timeframe must clear to be trustworthy:
-  1. WALK-FORWARD (Pardo): pick (donchian, risk_pct) on each TRAIN window by max train-Sharpe s.t.
-     train MaxDD <= train buy&hold MaxDD; apply out-of-sample; stitch. PASS: OOS Sharpe > buy&hold.
+  1. WALK-FORWARD (Pardo): pick from the small neighbouring promoted-strategy family on each TRAIN
+     window by max train-Sharpe s.t. train MaxDD <= train buy&hold MaxDD; apply out-of-sample;
+     stitch. PASS: OOS Sharpe > buy&hold.
   2. OOS MaxDD <= buy&hold gold (hard constraint).
   3. DEFLATED SHARPE > 0.95 over the trial count (López de Prado).
-  4. COST-STRESS: edge survives 2–3× nominal cost (the honesty check for fast timeframes).
+  4. COST-STRESS: edge survives 3× nominal cost (the honesty check for fast timeframes).
   5. PERMUTATION / MCPT: i.i.d.-shuffle returns (destroys trend structure), rebuild the price path,
      re-run; PASS: p < 0.05 that the real ordering's Sharpe beats random (Masters / Aronson).
 """
@@ -20,10 +21,15 @@ from . import costs, data, metrics
 from .strategy import DEFAULT_PARAMS, equity
 
 INIT_CASH = 10_000.0
-DONCHIAN = [(40, 20), (55, 20), (70, 30)]
-RISK = [0.02, 0.05]
 HEADLINE_RISK = 0.05
 MIN_TRAIN_BARS = 30
+
+# Small, predeclared robustness region around the shipped default. The headline candidate is one of
+# these variants: r=5%, re-risk inertia 0.10, 0.50x EMA300 overlay with volatility multiplier.
+OVERLAY_LEVELS = (0.25, 0.50, 0.75, 1.00)
+OVERLAY_MA_DAYS = (200, 300)
+OVERLAY_VOL_MULT = (False, True)
+RERISK_INERTIA = (0.10, 0.25)
 
 # Train ~6y, test 2y; OOS spans 2012–2025.
 WINDOWS = [
@@ -54,12 +60,28 @@ def benchmark(interval: str) -> pd.Series:
 
 
 def _cid(c: dict) -> str:
-    return f"L{c['long_entry_days']}/{c['long_exit_days']}_r{int(c['risk_pct_per_trade'] * 100)}"
+    suffix = "vol" if c["bull_overlay_vol_mult"] else "plain"
+    return (f"r{int(c['risk_pct_per_trade'] * 100)}_i{int(c['rerisk_inertia'] * 100)}_"
+            f"ov{c['bull_overlay']:g}_ema{c['bull_overlay_ma_days']}_{suffix}")
 
 
 def _candidates() -> list[dict]:
-    return [{"long_entry_days": le, "long_exit_days": lx, "risk_pct_per_trade": rp}
-            for (le, lx) in DONCHIAN for rp in RISK]
+    return [
+        {
+            "risk_pct_per_trade": HEADLINE_RISK,
+            "rerisk": True,
+            "rerisk_increase_only": False,
+            "rerisk_inertia": inertia,
+            "bull_overlay": overlay,
+            "bull_overlay_ma_days": ma_days,
+            "bull_overlay_ma_type": "ema",
+            "bull_overlay_vol_mult": vol_mult,
+        }
+        for overlay in OVERLAY_LEVELS
+        for ma_days in OVERLAY_MA_DAYS
+        for vol_mult in OVERLAY_VOL_MULT
+        for inertia in RERISK_INERTIA
+    ]
 
 
 def deflated_sharpe(returns: pd.Series, sr_trials: list[float], sr_obs: float, p: float) -> float:
@@ -159,4 +181,5 @@ def gates(interval: str, mcpt_n: int = 200) -> dict:
     }
     return {"interval": interval, "walk_forward": wf, "dsr": dsr, "cost3_sharpe": cost3,
             "bh_sharpe": bh_sharpe, "mcpt": perm, "checks": checks,
+            "trial_count": len(wf["trial_sr"]),
             "n_pass": sum(checks.values()), "all_pass": all(checks.values())}

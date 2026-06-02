@@ -1,30 +1,32 @@
 # CLAUDE.md — leveraged-gold-trend
 
-Public (MIT) Python package: a **governed-leverage trend-following strategy on gold (XAUUSD)** and a
-study of how the **same** strategy behaves across **9 timeframes (1m→1mo)** — and how trading costs
-kill the fast ones. Built for sharing (GitHub + a LinkedIn post). Reimplemented clean and
-self-contained from a private research strategy ("017") — **no vectorbt**; the headline equity is
-returns-based (numpy/pandas/scipy only).
+Public (MIT) Python package: a **governed-leverage trend-following strategy on gold (XAUUSD)** with a
+small volatility-scaled bull overlay, and a study of how the **same** strategy behaves across **9
+timeframes (1m→1mo)** — and how trading costs damage the fast ones. Built for sharing (GitHub + a
+LinkedIn post). Reimplemented clean and self-contained from a private research strategy ("017") —
+**no vectorbt**; the headline equity is returns-based (numpy/pandas/scipy only).
 
 **Read first:** `README.md` (the full report — source of truth) and `results/timeframe_scan.csv` (the
 9-timeframe evidence). `docs/linkedin-post.md` is the post (Portuguese).
 
-## The strategy (Approach A), in one paragraph
+## The strategy, in one paragraph
 
 Entry: Donchian breakout (new 55-day high → long; new 100-day low → short). Exit: ATR Chandelier
 trailing stop (5×ATR, 20-day ATR) — **no take-profit** (let winners run). Sizing: **risk-per-trade**
 — notional set so distance-to-stop = `risk_pct` of equity, with a **hard leverage cap** (3×).
+Open winners can be re-risked at new favourable closes with 10% inertia. While the core engine is
+flat, a 0.5× long overlay is allowed above the 300-day EMA and scaled down/up by relative volatility.
 Leverage is _governed risk_, never a "make more money" dial (over-betting → ruin; Vince/Kelly).
-Long **and** short, so it's weakly correlated to gold itself.
 
 ## Key results
 
-- **Headline (4h, risk 5%, cap 3×):** CAGR ~16%, Sharpe 0.88, MaxDD −26% — beats buy-&-hold gold on
-  return, Sharpe **and** drawdown. The **only** timeframe clearing all 5 anti-overfit gates
-  (walk-forward, deflated Sharpe, cost-stress 3×, permutation/MCPT).
-- **Timeframe finding (the point of the repo):** fast TFs die from **cost** (1m: 7.46%/yr cost drag,
-  Sharpe negative at 3× cost, 2151 trades from trailing-stop whipsaw); slow TFs (1w/1mo) die from
-  **too few trades** (~55–65 in 21 yrs → no statistical power). **4h is the sweet spot.**
+- **Headline (4h, risk 5%, cap 3×):** CAGR ~19.4%, Sharpe 1.03, MaxDD −25% — beats buy-&-hold gold on
+  return, Sharpe **and** drawdown. It clears all 5 anti-overfit gates (walk-forward, deflated Sharpe,
+  cost-stress 3×, permutation/MCPT).
+- **Timeframe finding (the point of the repo):** fast TFs die from **cost** (1m: 7.90%/yr cost drag,
+  Sharpe negative at 3× cost, 2411 entries/activations); slow TFs (1w/1mo) die from **too few events**
+  (~37–50 in 21 yrs → no statistical power). **1h and 4h pass all gates; 4h is the headline sweet
+  spot** because it has better Sharpe, lower drawdown, lower cost drag and stronger WFA than 1h.
 
 ## How to run
 
@@ -33,7 +35,7 @@ gitignored, so reruns work offline):
 
 ```bash
 .venv/bin/python -m leveraged_gold_trend --interval 4h     # headline
-#   --validate  → the 5 gates   ·   --scan → 9-TF table (~2 min)   ·   --plots → regen charts
+#   --validate  → the 5 gates   ·   --scan → 9-TF table (several min)   ·   --plots → regen charts
 ```
 
 Clean-room (as a public user would): create a venv, `pip install -e .`, then
@@ -52,8 +54,9 @@ Clean-room (as a public user would): create a venv, `pip install -e .`, then
   exception is `docs/linkedin-post.md` (Portuguese).
 - **Data is never committed** (1m parquet ≈ 100 MB; `.gitignore` excludes `data/*.parquet`).
   Precomputed evidence under `results/` **is** committed.
-- Shipped strategy is **Approach A**. B (naked vol-target leverage, blew up −64% DD) and C (regime
-  filter ≈ A) are _documented_ in the README, not runnable here.
+- Shipped strategy is the promoted `rerisk + 0.5x EMA300 bull overlay + volatility multiplier`
+  variant. The original pure Donchian/ATR baseline, B (naked vol-target leverage, blew up −64% DD),
+  and C (regime filter ≈ baseline) are documented in the README / research scripts.
 
 ## Layout
 
@@ -63,6 +66,6 @@ cached), `costs.py`, `metrics.py`, `validate.py` (the 5 gates), `timeframe_scan.
 
 ## State
 
-Git initialized on `main`, initial commit made, **not pushed** (no GitHub remote yet). Data source:
-Kaggle `novandraanugrah/xauusd-gold-price-historical-data-2004-2024`. Author: Victor Noleto. MIT +
-"not financial advice" disclaimer.
+Git initialized on `main`; GitHub remote is `victornoleto/leveraged-gold-trend`. Data source: Kaggle
+`novandraanugrah/xauusd-gold-price-historical-data-2004-2024`. Author: Victor Noleto. MIT + "not
+financial advice" disclaimer.

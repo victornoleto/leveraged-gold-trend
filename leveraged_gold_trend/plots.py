@@ -7,8 +7,8 @@ Two families of chart:
     charts. These read the precomputed scan so they stay fast (no strategy re-run), except the
     equity overlay which rebuilds each timeframe's curve.
 
-Convention: buy&hold gold is always BLACK, strategy equity is BLUE, and 4h — the only timeframe
-clearing all five gates — is highlighted in AMBER across every comparison.
+Convention: buy&hold gold is always BLACK, strategy equity is BLUE, and 4h — the headline sweet
+spot — is highlighted in AMBER across every comparison.
 """
 
 from __future__ import annotations
@@ -66,10 +66,10 @@ def equity_vs_gold(interval: str = "4h") -> Path:
     bh = validate.benchmark(interval)
     fig, ax = plt.subplots(figsize=(10, 5.5))
     ax.plot(eq.index, eq.values, lw=1.5, color=EQUITY_COLOR,
-            label=f"Leveraged Gold Trend ({interval}, risk 5%)")
+            label=f"Leveraged Gold Trend ({interval}, risk 5%, overlay)")
     ax.plot(bh.index, bh.values, lw=1.3, color=BENCHMARK_COLOR, label="Buy & hold gold")
     ax.set_yscale("log")
-    ax.set_title("Leveraged Gold Trend vs buy & hold gold (XAUUSD, log scale)")
+    ax.set_title("Leveraged Gold Trend + bull overlay vs buy & hold gold (XAUUSD, log scale)")
     ax.set_ylabel("Equity (log, $10k start)")
     ax.legend(loc="upper left", frameon=False)
     ax.grid(True, which="both", alpha=0.2)
@@ -110,8 +110,8 @@ def equity_all_timeframes() -> Path:
 
 def cost_decay(table: pd.DataFrame) -> Path:
     """The money chart: Sharpe after 3× costs vs timeframe, with cost-drag bars. Shows fast
-    timeframes destroyed by cost (drag explodes, Sharpe collapses) and slow ones fading on too few
-    trades — 4h is the sweet spot."""
+    timeframes destroyed by cost (drag explodes, Sharpe collapses), slow ones fading on too few
+    trades, and 1h/4h surviving in the middle."""
     t = table.set_index("tf").reindex(ORDER)
     x = range(len(ORDER))
     bh = float(t["bh_oos_sharpe"].dropna().median())
@@ -139,7 +139,7 @@ def cost_decay(table: pd.DataFrame) -> Path:
 
 def risk_return_by_timeframe(table: pd.DataFrame) -> Path:
     """Risk vs return scatter: CAGR × Sharpe per timeframe, bubble size = #trades, colour = number
-    of anti-overfit gates passed. 4h sits alone in the top-right with all five gates green."""
+    of anti-overfit gates passed. 4h remains the strongest all-green headline point."""
     t = table.set_index("tf").reindex(ORDER)
     gates = t["gates"].map(_gates_int)
     sizes = np.sqrt(t["n_trades"].clip(lower=1).to_numpy()) * 13.0
@@ -168,7 +168,7 @@ def risk_return_by_timeframe(table: pd.DataFrame) -> Path:
 
 def gates_heatmap(table: pd.DataFrame) -> Path:
     """9 timeframes × 5 anti-overfit gates: green = pass, red = fail, grey = not tested (MCPT is
-    skipped on the ultra-fast bars). Only 4h is all-green."""
+    skipped on the ultra-fast bars)."""
     t = table.set_index("tf").reindex(ORDER)
     mcpt_j = GATE_COLS.index("gate_mcpt")
 
@@ -201,7 +201,7 @@ def gates_heatmap(table: pd.DataFrame) -> Path:
             lbl.set_fontweight("bold")
             lbl.set_color(ACCENT)
     ax.set_ylabel("Timeframe (fast → slow)")
-    ax.set_title("Anti-overfit gates by timeframe — only 4h clears all five")
+    ax.set_title("Anti-overfit gates by timeframe — 1h and 4h clear all five")
     fig.tight_layout()
     return _save(fig, "gates_heatmap.png")
 

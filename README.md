@@ -1,11 +1,12 @@
 # Leveraged Gold Trend
 
-A trend-following strategy on **gold (XAUUSD)** with **governed leverage** — and a study of a
-question every systematic trader runs into: *if I take the **same** strategy and the **same** asset
-and only change the **timeframe**, what happens?* The short answer, with evidence across nine
-timeframes from 1-minute to monthly: **fast timeframes are destroyed by trading costs, slow ones by
-having too few trades, and there is a narrow sweet spot in the middle.** For this strategy on gold,
-that sweet spot is **4-hour bars**.
+A governed-leverage trend strategy on **gold (XAUUSD)**, with a small volatility-scaled bull overlay
+for flat regimes — and a study of a question every systematic trader runs into: *if I take the
+**same** strategy and the **same** asset and only change the **timeframe**, what happens?* The short
+answer, with evidence across nine timeframes from 1-minute to monthly: **fast timeframes are damaged
+by trading costs, slow ones by having too few trades, and the useful zone is narrow.** For this
+strategy on gold, the headline sweet spot is **4-hour bars**; 1-hour also clears the robustness gates,
+but with more cost, more drawdown, and weaker out-of-sample Sharpe.
 
 > ⚠️ **Not financial advice. Educational/research only.** This is a backtest. Leverage can wipe out
 > your account (and more). Past simulated performance does not predict the future. See
@@ -19,23 +20,26 @@ Same rules, 4-hour gold bars, 2004–2026, realistic costs:
 
 | Metric | Strategy (4h) | Buy & hold gold |
 |---|---|---|
-| CAGR | **16.1%** | 12.5% |
-| Sharpe | **0.88** | 0.76 |
-| Sortino | 0.69 | — |
-| Calmar | **0.61** | 0.28 |
-| Max drawdown | **−26%** | −45% |
-| Avg leverage | 2.0× (cap 3×) | 1× |
-| Time in market | 28% | 100% |
-| Trades (21 yrs) | 112 | — |
+| CAGR | **19.4%** | 12.5% |
+| Sharpe | **1.03** | 0.76 |
+| Sortino | 1.18 | — |
+| Calmar | **0.79** | 0.28 |
+| Max drawdown | **−25%** | −45% |
+| Avg leverage | 1.15× (cap 3×) | 1× |
+| Time in market | 75% | 100% |
+| Entries / overlay activations (21 yrs) | 158 | — |
 
 It beats simply holding gold on **return, risk-adjusted return, and drawdown** — and it does so
-while being out of the market 72% of the time and structurally **long *and* short**, so it is
-weakly correlated to gold itself.
+while still using governed leverage rather than a naked leverage dial. The core trend engine is long
+and short; the promoted default adds a small long overlay only while that engine is flat and gold is
+above its long-term trend filter.
 
 ![Equity vs gold](results/plots/equity_4h_vs_gold.png)
 
 It passed a full anti-overfitting battery (walk-forward, deflated Sharpe, cost-stress, permutation
-test — see [Methodology](#methodology--why-we-believe-it)). **It is the only timeframe that did.**
+test — see [Methodology](#methodology--why-we-believe-it)). **1h also passes; 4h remains the headline
+because it has the better full-sample Sharpe, lower drawdown, lower cost drag, and stronger
+walk-forward Sharpe.**
 
 ---
 
@@ -66,7 +70,7 @@ question.
 
 ## How the strategy works
 
-Three independent ideas, kept deliberately simple (few parameters → less room to overfit).
+Five ideas, kept deliberately simple enough to audit.
 
 ### 1. Entry — Donchian breakout (ride the trend)
 
@@ -110,14 +114,30 @@ leverage = min(notional_fraction, CAP)   # hard ceiling, CAP = 3×
 
 So a **tight** stop (calm market, low ATR) earns a **larger** position, a **wide** stop earns a
 smaller one — and the gross exposure is **never** allowed above a hard cap (3×). Leverage *emerges*
-from volatility and is *governed* by the cap. On 4h gold this averages ≈2.0× and only touches 3× in
-the calmest regimes.
+from volatility and is *governed* by the cap. On the promoted 4h default the average gross exposure
+is ≈1.15× because the small overlay spends more time active than the high-conviction breakout engine;
+the cap still binds on the strongest core trend trades.
 
 **The leverage is not free.** Sweeping `r` from 1% → 20% reproduces Vince's growth-then-ruin curve
 exactly: CAGR rises until ≈5%, then **Sharpe and Calmar fall while drawdown explodes**. The
-risk-adjusted optimum is a *modest* 2–5% per trade (≈1–2× average leverage), not the cap. We ship
-`r = 5%` as the "grow faster but still beat buy-&-hold on every axis" setting; `r = 2%` is the more
-conservative choice (≈−11% max drawdown).
+risk-adjusted optimum is a *modest* 2–5% per trade, not the cap. We ship `r = 5%` as the "grow faster
+but still beat buy-&-hold on every headline axis" setting; reduce it if the drawdown profile is too
+aggressive.
+
+### 4. Re-risking — keep winners sized, but with inertia
+
+When an open trade makes a new favourable close, the strategy can recompute the distance to the
+ratcheted stop and rebalance back toward the intended risk. A 10% inertia band suppresses tiny
+adjustments, so this is not continuous churn: it is a controlled way to keep large winners from
+becoming under-sized after the stop moves.
+
+### 5. Bull overlay — participate when the core engine is flat
+
+Pure breakout systems often miss long stretches of a secular bull market while waiting for a fresh
+high after a pullback. The promoted default adds up to **0.5× long** exposure while the core state
+machine is flat and gold is above a **300-day EMA**. That overlay is scaled by a volatility-regime
+multiplier: larger in relatively calm regimes, smaller when volatility is high. It is deliberately
+small, long-only, and disabled whenever the main Donchian/ATR engine has a position.
 
 ---
 
@@ -131,45 +151,48 @@ A concrete recipe (this is description, not advice):
   each 4h close (~6 checks/day — not a screen-watching system).
 - **Each 4h close, do this:**
   1. Update the 55-day high, 100-day low, the 20/50-day exit channels, and the 20-day ATR (in 4h
-     bars: 55 days ≈ 330 bars, 20 days ≈ 120 bars).
-  2. **If flat:** new 55-day-high close → go long; new 100-day-low close → go short.
+     bars: 55 days ≈ 330 bars, 20 days ≈ 120 bars), plus the 300-day EMA for the overlay.
+  2. **If flat:** new 55-day-high close → go long; new 100-day-low close → go short. If neither
+     breakout fires but gold is above its 300-day EMA, hold the small volatility-scaled long overlay.
   3. **Size it:** stop distance = 5 × ATR. Risk 5% of equity to that stop →
      `units = 0.05 × equity / (5 × ATR × point_value)`, capped so notional ≤ 3 × equity.
-  4. **If in a position:** trail the stop (highest-close-since-entry − 5×ATR for longs); exit on a
-     stop hit or the opposite channel. No take-profit.
+  4. **If in a core position:** trail the stop (highest-close-since-entry − 5×ATR for longs); exit on
+     a stop hit or the opposite channel. If the trade keeps making favourable closes, re-risk toward
+     the current stop distance, subject to the 10% inertia band. No take-profit.
 - **Worked example:** equity \$10,000, gold \$2,000, ATR = \$20 → stop distance \$100 (5% of price).
   Risk \$500 → notional \$500 / 0.05 = \$10,000 = **1.0×**. If the market is calmer (ATR \$10), the
   stop is 2.5% → size doubles to **2.0×**; the 3× cap binds only when ATR gets very small.
 - **Watch in live trading:** overnight **swap/financing** (charged daily on leveraged positions —
-  *not* modelled here, see below) and **slippage** in thin sessions. Both hurt more the faster you
-  trade — which is the whole point of the next section.
+   *not* modelled here, see below) and **slippage** in thin sessions. Both hurt more the faster you
+  trade — and the overlay is active more often than the pure breakout engine, so financing matters.
 
 ---
 
 ## The timeframe question (the main event)
 
-Here is the same strategy (`r = 5%`, cap 3×), the same asset, run on **all nine timeframes**.
+Here is the same promoted strategy (`r = 5%`, cap 3×, 0.5× EMA300 volatility-scaled overlay), the
+same asset, run on **all nine timeframes**.
 `cost_drag` = CAGR percentage points lost to costs; `cost3 Sharpe` = Sharpe after **3× nominal
 cost**; `WF Sharpe` = walk-forward out-of-sample Sharpe (vs buy-&-hold "B&H"); `MCPT p` = permutation
 p-value (blank where skipped for runtime); `gates` = how many of the 5 anti-overfit gates pass.
 
-| TF | bars | trades | CAGR | Sharpe | MaxDD | avg lev | cost_drag | cost3 Sharpe | WF Sharpe (B&H) | DSR | MCPT p | gates |
+| TF | bars | entries | CAGR | Sharpe | MaxDD | avg lev | cost_drag | cost3 Sharpe | WF Sharpe (B&H) | DSR | MCPT p | gates |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|:--|
-| 1m | 6.8M | 2151 | 0.4% | 0.09 | −47% | 3.00 | **7.46%** | **−1.71** | 0.40 (0.51) | 0.868 | — | 1/5 |
-| 5m | 1.4M | 939 | 6.0% | 0.57 | −33% | 3.00 | 3.37% | 0.02 | 0.62 (0.53) | 0.988 | — | 3/5 |
-| 15m | 494k | 547 | 6.7% | 0.52 | −35% | 3.00 | 1.97% | 0.26 | 0.65 (0.54) | 0.988 | — | 3/5 |
-| 30m | 249k | 372 | 10.7% | 0.67 | −41% | 2.99 | 1.38% | 0.53 | 0.86 (0.54) | 0.999 | 0.016 | 4/5 |
-| 1h | 125k | 243 | 12.8% | 0.71 | −29% | 2.93 | 0.90% | 0.63 | 0.77 (0.54) | 0.996 | 0.010 | 4/5 |
-| **4h** | **33k** | **112** | **16.1%** | **0.88** | **−26%** | **2.04** | **0.29%** | **0.86** | **0.80 (0.55)** | **0.998** | **0.007** | **5/5 ✅** |
-| 1d | 5.5k | 68 | 5.2% | 0.50 | −33% | 0.81 | 0.06% | 0.49 | 0.28 (0.53) | 0.840 | 0.119 | 1/5 |
-| 1w | 1.1k | 65 | 1.9% | 0.44 | −17% | 0.32 | 0.02% | 0.43 | 0.08 (0.54) | 0.588 | 0.154 | 1/5 |
-| 1mo | 260 | 55 | 1.2% | 0.56 | −6% | 0.15 | 0.01% | 0.55 | 0.43 (0.52) | 0.949 | 0.030 | 2/5 |
+| 1m | 6.8M | 2411 | 5.2% | 0.52 | −30% | 0.67 | **7.90%** | **−0.78** | 0.17 (0.51) | 0.425 | — | 1/5 |
+| 5m | 1.4M | 1115 | 11.8% | 0.85 | −28% | 0.78 | 3.63% | 0.40 | 0.51 (0.53) | 0.941 | — | 1/5 |
+| 15m | 494k | 636 | 12.8% | 0.80 | −40% | 0.89 | 2.12% | 0.57 | 0.49 (0.54) | 0.909 | — | 0/5 |
+| 30m | 249k | 447 | 16.4% | 0.89 | −46% | 0.99 | 1.49% | 0.75 | 0.64 (0.54) | 0.979 | 0.016 | 3/5 |
+| **1h** | **125k** | **298** | **19.1%** | **0.93** | **−28%** | **1.11** | **0.99%** | **0.85** | **0.69 (0.54)** | **0.984** | **0.010** | **5/5 ✅** |
+| **4h** | **33k** | **158** | **19.4%** | **1.03** | **−25%** | **1.15** | **0.35%** | **1.00** | **0.82 (0.55)** | **0.999** | **0.007** | **5/5 ✅** |
+| 1d | 5.5k | 62 | 7.2% | 0.70 | −25% | 0.70 | 0.08% | 0.68 | 0.35 (0.53) | 0.881 | 0.030 | 2/5 |
+| 1w | 1.1k | 50 | 3.2% | 0.50 | −29% | 0.43 | 0.05% | 0.49 | 0.27 (0.54) | 0.723 | 0.209 | 1/5 |
+| 1mo | 260 | 37 | 3.6% | 0.60 | −12% | 0.31 | 0.04% | 0.59 | 0.26 (0.52) | 0.653 | 0.109 | 1/5 |
 
 The headline chart, but for **all nine timeframes at once** (each at `r = 5%`, daily-sampled, log
-scale). Only **4h** (amber) pulls clearly above buy-&-hold gold (black); the fast timeframes are
-dragged flat along the bottom by cost, and the slow ones barely lever up. One strategy, nine speeds —
-almost the entire spread between them is a cost-and-sample-size story, which the rest of this section
-unpacks.
+scale). **1h and 4h** both pull above buy-&-hold gold (black); 4h is highlighted because it keeps the
+best combination of return, Sharpe, drawdown, cost drag, and walk-forward evidence. One strategy,
+nine speeds — almost the entire spread between them is a cost-and-sample-size story, which the rest
+of this section unpacks.
 
 ![Strategy equity for every timeframe vs gold](results/plots/equity_all_timeframes_vs_gold.png)
 
@@ -177,21 +200,21 @@ unpacks.
 
 ### How costs "kill" the fast timeframes
 
-Look at the `cost_drag` column climb as the bars get finer: **0.01% at monthly → 0.29% at 4h →
-7.46% at 1-minute**. The 1m version loses *seven and a half CAGR points* to costs, and once you
-stress costs to a realistic 3× its Sharpe goes **negative (−1.71)** — it is a *losing* system after
-fees. Why does turnover (and therefore cost) explode on fast bars even though the lookbacks are the
-same number of days? Because the **trailing stop whipsaws**: on 1-minute bars the 5×ATR stop is hit
-and re-entered far more often within the *same* trend (2151 trades vs 112 on 4h), and every one of
-those round-trips pays the spread. Faster ≠ more edge; faster = **more friction**.
+Look at the `cost_drag` column climb as the bars get finer: **0.04% at monthly → 0.35% at 4h →
+7.90% at 1-minute**. The 1m version loses almost eight CAGR points to costs, and once you stress
+costs to a realistic 3× its Sharpe goes **negative (−0.78)**. Why does turnover (and therefore cost)
+explode on fast bars even though the lookbacks are the same number of days? Because the trailing stop
+and the volatility-scaled overlay adjust far more often on fine bars (2411 entries/activations at 1m
+vs 158 on 4h), and every exposure change pays the spread. Faster ≠ more edge; faster = **more
+friction**.
 
 ![Trade count by timeframe — two ways to die](results/plots/trades_by_timeframe.png)
 
-This is the whole study in one chart — **two ways to die.** Trade count *explodes* toward fast bars
-(2151 at 1m, almost all of it trailing-stop whipsaw *within* the same trend) and *starves* toward
-slow ones (55 at monthly). The fast end pays that turnover away in spread; the slow end runs out of
-statistical evidence (next subsection). 4h (amber) lands where there are enough trades to mean
-something, yet few enough that cost stays a rounding error.
+This is the whole study in one chart — **two ways to die.** Entry/activation count *explodes* toward
+fast bars (2411 at 1m, much of it trailing-stop whipsaw and overlay adjustment) and *starves* toward
+slow ones (37 at monthly). The fast end pays that turnover away in spread; the slow end runs out of
+statistical evidence (next subsection). 1h and 4h land where there are enough observations to mean
+something, yet few enough that cost is still survivable.
 
 And remember costs here are modelled at a *nominal* tight spread. Real intraday gold spreads in thin
 hours are wider, and **overnight financing is not charged at all** — both of which would punish the
@@ -200,74 +223,99 @@ fast timeframes even harder. So if anything this *understates* the cost cliff.
 ### Why the slow timeframes fail too
 
 The other end is more subtle. At weekly/monthly bars cost is negligible (`cost_drag` ≈ 0) — but the
-strategy now makes only ~55–65 trades in 21 years, and **a handful of trades carries almost no
-statistical evidence.** Their walk-forward Sharpe collapses (1w: 0.08), their deflated Sharpe falls
-below the 0.95 bar (1w: 0.59), and the permutation test can't distinguish them from luck. They also
-under-use leverage (avg 0.15–0.32×), because over a long bar the ATR stop is wide in percentage
-terms, so the risk-per-trade sizing keeps positions small. Daily (1d) sits in a dead zone: too few
-trades to beat buy-&-hold (WF Sharpe 0.28) and no longer fast enough to add timing value.
+strategy now makes only 37–50 entries/activations in 21 years, and **a handful of events carries
+almost no statistical evidence.** Their walk-forward Sharpe stays well below buy-&-hold (1w: 0.27;
+1mo: 0.26), their deflated Sharpe falls below the 0.95 bar, and the permutation test can't distinguish
+them from luck. They also under-use leverage (avg 0.31–0.43×), because over a long bar the ATR stop is
+wide in percentage terms, so the risk-per-trade sizing keeps core positions small. Daily (1d) sits in
+a dead zone: too few events to beat buy-&-hold out-of-sample and no longer fast enough to add much
+timing value.
 
 ### The sweet spot
 
-**4h is the only timeframe that clears all five gates.** It is fast enough to time gold's trends
-finely (16% CAGR, 0.88 Sharpe, deflated Sharpe 0.998, permutation p = 0.007) yet slow enough that
-costs are still a rounding error (0.29% drag; survives 3× cost with Sharpe 0.86). 1h and 30m have a
-*real* edge too (permutation p ≈ 0.01) but flunk the cost-stress gate. That's the lesson in one
-sentence: **the right timeframe is the one where your edge is real *and* your costs are still
-negligible — and for leveraged gold trend, that's 4 hours.**
+**1h and 4h clear all five gates; 4h is the headline sweet spot.** The promoted overlay makes 1h a
+credible neighbour, but 4h is cleaner: 19.4% CAGR, 1.03 Sharpe, −25% max drawdown, deflated Sharpe
+0.999, permutation p = 0.007, 0.35% cost drag, and Sharpe 1.00 even at 3× cost. 1h is viable but
+costlier (0.99% drag), lower Sharpe (0.93), lower walk-forward Sharpe (0.69 vs 0.82), and deeper OOS
+drawdown (−38% vs −30%). That's the lesson in one sentence: **the right timeframe is the one where
+your edge is real *and* your costs are still negligible — and for leveraged gold trend, 4h remains the
+best balance.**
 
 ![Risk vs return by timeframe](results/plots/risk_return_by_timeframe.png)
 
 Plotting every timeframe by return (x) against risk-adjusted return (y) — bubble size = number of
-trades, colour = anti-overfit gates passed — makes the sweet spot visually obvious: **4h sits alone
-in the top-right, dark green (5/5 gates).** The huge orange 1m bubble (most trades, lowest Sharpe, a
-single gate) is the cost cliff in one dot, and the small bubbles hugging the buy-&-hold line are the
-trade-starved slow timeframes.
+entries, colour = anti-overfit gates passed — makes the useful zone visually obvious: **1h and 4h are
+dark green, with 4h higher on Sharpe and lower on cost.** The huge fast-timeframe bubbles are the cost
+cliff in one dot, and the small bubbles hugging the buy-&-hold line are the event-starved slow
+timeframes.
 
 ![Max drawdown by timeframe](results/plots/maxdd_by_timeframe.png)
 
-Drawdown tells the same story from the risk side: it is worst exactly where the leverage cap binds
-hardest (full-sample −47% at 1m, −41% at 30m), while 4h's −26% is among the mildest of the
-*leveraged* timeframes. The blue bars are the walk-forward out-of-sample drawdowns — and **every**
-timeframe clears the "OOS drawdown ≤ buy-&-hold gold" gate, because that ceiling is a hard constraint
-baked into the parameter selection, never a quantity we maximize.
+Drawdown tells the same story from the risk side: it is worst where the fast bars still churn but the
+edge is not clean enough (full-sample −46% at 30m; OOS −51%). 4h's −25% full-sample drawdown is the
+mildest of the high-return leveraged timeframes, and its −30% walk-forward drawdown stays comfortably
+inside buy-&-hold gold's −41% OOS drawdown.
+
+---
+
+## Lot-size multiplier stress test
+
+The shipped strategy already uses governed leverage: position size comes from risk-to-stop and is
+capped at 3×. But it is useful to ask what happens if someone simply multiplies the final exposure by
+an external lot-size multiplier. This is **not** the default strategy; it is a leverage stress test on
+top of the exact same 4h signals, stops, overlay, re-risking, and costs.
+
+![Lot-size multiplier equity curves](results/plots/equity_4h_lot_multipliers.png)
+
+| Lot multiplier | CAGR | Sharpe | MaxDD | Avg leverage | Max leverage |
+|---:|---:|---:|---:|---:|---:|
+| 0.5× | 9.7% | 1.03 | −13.0% | 0.58× | 1.5× |
+| 1.0× | 19.4% | 1.03 | −24.7% | 1.15× | 3.0× |
+| 2.0× | 37.8% | 1.03 | −45.8% | 2.31× | 6.0× |
+| 3.0× | 53.8% | 1.03 | −64.6% | 3.46× | 9.0× |
+
+The equity curve looks tempting because CAGR scales up dramatically, but the drawdown scales up too:
+2× already reaches a buy-&-hold-like drawdown, and 3× turns the strategy into a −65% max-drawdown
+profile. Sharpe stays almost unchanged because this test mostly scales the same return stream and the
+same turnover costs. That is exactly the point: lot-size multipliers are not new edge; they are a
+choice to trade the same edge with more ruin risk.
 
 ---
 
 ## Methodology — why we believe it
 
 Backtests lie if you let them. Every result above is gated by five standard anti-overfitting tests
-(run on a 2008–2019 *search* window, then confirmed on an untouched 2020–2025 *holdout*; parameters
-are selected only on training data):
+(parameters are selected only on training windows, then stitched out-of-sample):
 
-1. **Walk-forward analysis** (Pardo) — pick the breakout/risk parameters on each in-sample window,
-   apply them to the next out-of-sample window, stitch the OOS pieces. PASS only if OOS Sharpe beats
-   buy-&-hold gold.
+1. **Walk-forward analysis** (Pardo) — pick from a small predeclared family around the promoted
+   default (overlay size 0.25–1.0×, EMA 200/300, volatility multiplier on/off, re-risk inertia
+   10%/25%) on each in-sample window, apply it to the next out-of-sample window, and stitch the OOS
+   pieces. PASS only if OOS Sharpe beats buy-&-hold gold.
 2. **Drawdown constraint** — OOS max drawdown must be ≤ buy-&-hold gold's. Drawdown is a hard limit,
    never the thing we maximize.
 3. **Deflated Sharpe ratio** (López de Prado) — corrects the observed Sharpe for the number of
    configurations tried and for non-normal returns. PASS if > 0.95.
-4. **Cost stress** — re-run at 2× and 3× the nominal spread. The edge must survive realistic, even
+4. **Cost stress** — re-run at 3× the nominal spread. The edge must survive realistic, even
    pessimistic, costs.
 5. **Permutation test / MCPT** (Masters, Aronson) — shuffle the return sequence (destroying trend
-   structure), rebuild a synthetic price path, and re-run thousands of times. PASS if the real
+   structure), rebuild a synthetic price path, and re-run many times. PASS if the real
    ordering's Sharpe beats the random ones with p < 0.05 — i.e. the edge comes from *trend*, not from
    curve-fitting.
 
 ![Anti-overfit gates by timeframe](results/plots/gates_heatmap.png)
 
-Running all five gates across all nine timeframes makes the verdict unambiguous — **only 4h is green
-on every gate.** The fast timeframes (1m–15m) fail the cost-stress gate (1m fails most of them); the
-slow ones (1d–1mo) fail walk-forward and deflated-Sharpe for lack of trades. MCPT is marked *n/a* on
-the three fastest bars, where the permutation test is too expensive to run (the other columns already
-condemn them).
+Running all five gates across all nine timeframes makes the verdict sharper than the headline table
+alone: **1h and 4h are green on every gate, and 4h is the stronger of the two.** The fast timeframes
+(1m–30m) fail cost-stress and/or OOS drawdown; the slow ones (1d–1mo) fail walk-forward and
+deflated-Sharpe for lack of events. MCPT is marked *n/a* on the three fastest bars, where the
+permutation test is too expensive to run (the other columns already condemn them).
 
-We also built three variants and let the backtest pick (rather than arguing from authority):
-**(A)** the breakout + trailing-stop system above; **(B)** a continuous volatility-targeted EWMAC
-trend with the same leverage cap; **(C)** A plus a moving-average regime filter. **B blew up** — naked
-volatility-target leverage on a single asset over-levers in calm regimes and took a −64% drawdown,
-the textbook over-betting failure. **C ≈ A** — the regime filter added nothing on gold. So the shipped
-strategy is **A**.
+The promoted default came after a staged research path, not after blindly adding knobs. The original
+pure Donchian/ATR system already worked on 4h (16.1% CAGR, 0.88 Sharpe, −26% max drawdown, 5/5 gates)
+but lagged passive gold in the early bull market. A naked volatility-targeted EWMAC variant blew up
+(−64% drawdown), and a simple regime filter added little. The promoted re-risk + 0.5× EMA300 overlay
+variant was then validated against the neighbouring family above, including DSR, cost stress, and
+permutation testing, before becoming the default.
 
 ---
 
@@ -279,13 +327,14 @@ Read these before taking any of the numbers seriously.
   turnover but not the daily carry on a held leveraged position. For a system that holds trades for
   days/weeks this **understates real cost** — treat the headline as a mild upper bound. (It does not
   change the *timeframe ranking*; if anything it widens the gap against the fast TFs.)
-- **One asset, one (favourable) sample.** 2004–2026 is largely a secular gold bull. Long/short and
-  the permutation test mitigate the long bias, but a single asset over a single regime is thin
-  evidence. Don't extrapolate to other assets or regimes without re-testing.
+- **One asset, one (favourable) sample.** 2004–2026 is largely a secular gold bull. The core engine is
+  long/short, but the promoted overlay deliberately adds long exposure in bull regimes. A single asset
+  over a single regime is thin evidence. Don't extrapolate to other assets or regimes without
+  re-testing.
 - **It's a returns-based simulation, not an order-book backtest.** Fills are modelled at bar
   granularity with a close-based trailing stop and constant-fraction (daily-rebalanced) leverage;
   live execution (gaps, intrabar stop fills, partial fills, slippage spikes) will differ.
-- **Drawdown is real.** −26% at `r = 5%` (and the fast/leverage-pinned variants hit −40%+). Leverage
+- **Drawdown is real.** −25% at `r = 5%` (and some faster variants still hit −40%+). Leverage
   cuts both ways. Size down (`r = 2%`) if that hurts.
 - **No look-ahead, by construction** — signals use only completed bars; exposure decided at a bar's
   close earns the *next* bar's return; rolling stats are shifted. But verify it yourself.
@@ -303,11 +352,12 @@ python -m leveraged_gold_trend --interval 4h            # headline metrics
 python -m leveraged_gold_trend --interval 4h --validate # + the 5 gates
 python -m leveraged_gold_trend --scan                   # the 9-timeframe table -> results/
 python -m leveraged_gold_trend --plots                  # regenerate the charts
+python scripts/multiplier_scan.py --interval 4h         # lot-size multiplier stress test
 ```
 
 The precomputed evidence is committed under [`results/`](results/) (the 9-timeframe table, the
-headline metrics JSON, and all seven charts), so you can read the whole study without downloading
-anything or re-running the heavy 1-minute pass (which takes a couple of minutes).
+headline metrics JSON, the multiplier stress test, and the charts), so you can read the whole study
+without downloading anything or re-running the heavy 1-minute pass (which can take several minutes).
 
 **Data:** Kaggle `novandraanugrah/xauusd-gold-price-historical-data-2004-2024`. Not redistributed
 here (the 1-minute file alone is ~100 MB); `download_data.py` fetches it.
@@ -319,7 +369,9 @@ here (the 1-minute file alone is ~100 MB); `download_data.py` fetches it.
 The strategy and its validation are grounded in the systematic-trading literature:
 
 - Robert Carver — *Leveraged Trading* (2019) and *Systematic Trading* (2015): risk-target position
-  sizing; leverage as the central danger of retail trading.
+  sizing; leverage as the central danger of retail trading; volatility-aware exposure scaling.
+- Gary Antonacci — *Dual Momentum Investing* (2014), and Michael Gayed's work on leverage and
+  volatility regimes: bull-regime participation with explicit risk control.
 - Andreas Clenow — *Following the Trend* (2023) and *Stocks on the Move* (2015): diversified trend
   following; let winners run, exit by stop/rank not profit target.
 - Ralph Vince — *The Leverage Space Trading Model* (2009): over-betting drives positive-expectation

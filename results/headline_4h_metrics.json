@@ -1,14 +1,14 @@
 {
-  "total_return": 24.2282,
-  "cagr": 0.1609,
-  "volatility_annual": 0.188,
-  "sharpe": 0.8846,
-  "sortino": 0.6854,
-  "max_drawdown": -0.2617,
-  "calmar": 0.6147,
+  "total_return": 45.3328,
+  "cagr": 0.194,
+  "volatility_annual": 0.1893,
+  "sharpe": 1.029,
+  "sortino": 1.1826,
+  "max_drawdown": -0.2469,
+  "calmar": 0.7856,
   "n_periods": 32959,
-  "n_trades": 112,
-  "avg_leverage": 2.0362540317332045,
+  "n_trades": 158,
+  "avg_leverage": 1.154981323361768,
   "max_leverage": 3.0,
-  "pct_time_in_market": 0.27848907766990294
+  "pct_time_in_market": 0.7486953883495145
 }

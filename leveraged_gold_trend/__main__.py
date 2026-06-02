@@ -15,6 +15,7 @@ from . import data, metrics, validate
 from .strategy import DEFAULT_PARAMS, target_exposure, trade_stats
 
 HEADLINE_RISK = 0.05
+HEADLINE_LABEL = "Donchian/ATR + 0.5x EMA300 volatility-scaled bull overlay"
 
 
 def _headline(interval: str, run_gates: bool) -> None:
@@ -26,12 +27,13 @@ def _headline(interval: str, run_gates: bool) -> None:
                            {**DEFAULT_PARAMS, "risk_pct_per_trade": HEADLINE_RISK}, data.BARS_PER_DAY[interval])
     ts = trade_stats(expo)
 
-    print(f"\n=== Leveraged Gold Trend — XAUUSD {interval} (Approach A, risk 5%, cap 3×) ===")
+    print(f"\n=== Leveraged Gold Trend — XAUUSD {interval} (risk 5%, cap 3×) ===")
+    print(f"  {HEADLINE_LABEL}")
     print(f"  CAGR {m['cagr'] * 100:.2f}%   Sharpe {m['sharpe']:.2f}   Sortino {m['sortino']:.2f}   "
           f"Calmar {m['calmar']:.2f}   MaxDD {m['max_drawdown'] * 100:.1f}%")
     print(f"  buy&hold gold: CAGR {metrics.from_equity(bh, p)['cagr'] * 100:.2f}%   "
           f"Sharpe {metrics.sharpe(bh, p):.2f}")
-    print(f"  trades {ts['n_trades']}   avg leverage {ts['avg_leverage']:.2f}×   "
+    print(f"  entries {ts['n_trades']}   avg leverage {ts['avg_leverage']:.2f}×   "
           f"max {ts['max_leverage']:.2f}×   time in market {ts['pct_time_in_market'] * 100:.0f}%")
 
     if run_gates:

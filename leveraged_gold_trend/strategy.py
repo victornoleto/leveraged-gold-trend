@@ -1,11 +1,13 @@
-"""The Leveraged Gold Trend strategy (Approach A) — pure numpy/pandas, no vectorbt.
+"""The Leveraged Gold Trend strategy — pure numpy/pandas, no vectorbt.
 
 Edge: gold trends (long safe-haven / inflation moves) between extended ranges. We
   • ENTER on a Donchian breakout (new N-day high → long; new N-day low → short),
   • EXIT on an ATR (Chandelier) trailing stop that ratchets toward price, locking gains and letting
     winners run — no take-profit, because a profit target caps the right tail where trend following
     makes its money,
-  • SIZE by risk-per-trade so leverage *emerges* from the stop distance and is bounded by a hard cap.
+  • SIZE by risk-per-trade so leverage *emerges* from the stop distance and is bounded by a hard cap,
+  • RE-RISK open winners at new favourable closes with inertia, and
+  • ADD a small volatility-scaled long overlay while flat in gold bull regimes.
 
 Risk-per-trade sizing (the heart of "governed leverage"): if notional = f·equity and price moves
 ``stop_frac`` against us, the loss is f·equity·stop_frac. Setting that equal to ``risk_pct``·equity
@@ -14,8 +16,8 @@ but never beyond the cap. Leverage is a *consequence of risk*, never a "win-more
 
 Headline equity is returns-based: a causal signed-exposure series (decided at each bar's close,
 earning the next bar's return — so it is effectively lagged) times asset returns, minus turnover
-cost. The optional ``regime_ma`` (off by default) adds a trend filter — that variant is "Approach C"
-in the report.
+cost. The bull overlay is also causal: it uses completed-bar trend and volatility estimates, and only
+applies when the main Donchian/ATR state machine is flat.
 """
 
 from __future__ import annotations
@@ -35,7 +37,18 @@ DEFAULT_PARAMS: dict = {
     "risk_pct_per_trade": 0.05,  # f% of equity risked to the initial stop (sweep 0.02–0.05)
     "leverage_cap": 3.0,         # hard ceiling on gross exposure (× notional)
     "allow_short": True,
-    "regime_ma": 0,              # 0 = off (Approach A); >0 days = Approach C (trend filter)
+    "regime_ma": 0,              # optional entry filter; 0 = off
+    "rerisk": True,              # rebalance open winners at new favourable closes
+    "rerisk_increase_only": False,
+    "rerisk_inertia": 0.10,      # suppress small re-risk trades
+    "bull_overlay": 0.50,        # long exposure while flat and above the overlay trend filter
+    "bull_overlay_ma_days": 300,
+    "bull_overlay_ma_type": "ema",
+    "bull_overlay_vol_mult": True,
+    "bull_overlay_vol_days": 32,
+    "bull_overlay_vol_history_days": 252 * 5,
+    "bull_overlay_vol_min_history_days": 252,
+    "bull_overlay_vol_smooth_days": 10,
 }
 
 
@@ -47,6 +60,20 @@ def _atr(high: pd.Series, low: pd.Series, close: pd.Series, span: int) -> pd.Ser
     prev = close.shift(1)
     tr = pd.concat([high - low, (high - prev).abs(), (low - prev).abs()], axis=1).max(axis=1)
     return tr.ewm(span=span, adjust=False, min_periods=span).mean()
+
+
+def _vol_regime_multiplier(close: pd.Series, bars_per_day: float, params: dict) -> pd.Series:
+    """Carver-style overlay scaler: larger in low relative volatility, smaller in high volatility."""
+    vol_win = _bars(params.get("bull_overlay_vol_days", 32), bars_per_day)
+    hist_win = _bars(params.get("bull_overlay_vol_history_days", 252 * 5), bars_per_day)
+    min_hist = _bars(params.get("bull_overlay_vol_min_history_days", 252), bars_per_day)
+    smooth = _bars(params.get("bull_overlay_vol_smooth_days", 10), bars_per_day)
+
+    current_vol = close.pct_change().rolling(vol_win, min_periods=vol_win).std()
+    long_vol = current_vol.expanding(min_periods=min_hist).mean()
+    rel_vol = current_vol / long_vol
+    vol_rank = rel_vol.rolling(hist_win, min_periods=min_hist).rank(pct=True)
+    return (2.0 - 1.5 * vol_rank).ewm(span=smooth, adjust=False).mean()
 
 
 def _signals(df: pd.DataFrame, params: dict, bars_per_day: float) -> dict:
@@ -67,7 +94,7 @@ def _signals(df: pd.DataFrame, params: dict, bars_per_day: float) -> dict:
         short_exit = pd.Series(False, index=close.index)
 
     regime_ma = int(params.get("regime_ma", 0))
-    if regime_ma > 0:  # Approach C: only longs above the MA, only shorts below
+    if regime_ma > 0:  # optional filter: only longs above the MA, only shorts below
         win = _bars(regime_ma, bars_per_day)
         ma = close.rolling(win, min_periods=win).mean()
         long_entry = long_entry & (close > ma)
@@ -97,6 +124,24 @@ def target_exposure(df: pd.DataFrame, params: dict, bars_per_day: float) -> pd.S
     risk_pct = float(params.get("risk_pct_per_trade", 0.05))
     cap = float(params.get("leverage_cap", 3.0))
     allow_short = bool(params.get("allow_short", True))
+    rerisk = bool(params.get("rerisk", False))
+    rerisk_increase_only = bool(params.get("rerisk_increase_only", False))
+    rerisk_inertia = float(params.get("rerisk_inertia", 0.0))
+
+    bull_overlay = float(params.get("bull_overlay", 0.0))
+    if bull_overlay > 0.0:
+        win = _bars(params.get("bull_overlay_ma_days", 200), bars_per_day)
+        if str(params.get("bull_overlay_ma_type", "sma")).lower() == "ema":
+            overlay_ma = sig["close"].ewm(span=win, adjust=False, min_periods=win).mean()
+        else:
+            overlay_ma = sig["close"].rolling(win, min_periods=win).mean()
+        bull_overlay = min(bull_overlay, cap)
+        overlay = pd.Series(bull_overlay, index=sig["close"].index)
+        if bool(params.get("bull_overlay_vol_mult", False)):
+            overlay = (overlay * _vol_regime_multiplier(sig["close"], bars_per_day, params)).clip(0.0, cap)
+        overlay = overlay.where(sig["close"] > overlay_ma, 0.0).fillna(0.0).to_numpy(float)
+    else:
+        overlay = np.zeros(len(c), dtype=float)
 
     n = len(c)
     exposure = np.zeros(n)
@@ -106,13 +151,37 @@ def target_exposure(df: pd.DataFrame, params: dict, bars_per_day: float) -> pd.S
         atr_t = a[t]
         exited = False
         if pos > 0.0:
+            old_peak = peak
             peak = max(peak, c[t])
             if (not np.isnan(atr_t) and c[t] <= peak - stop_atr * atr_t) or lx[t]:
                 pos, exited = 0.0, True
+            elif rerisk and not np.isnan(atr_t) and atr_t > 0.0 and peak > old_peak:
+                stop = peak - stop_atr * atr_t
+                stop_dist = c[t] - stop
+                if stop_dist > 0.0:
+                    target = min(risk_pct * c[t] / stop_dist, cap)
+                    should_update = (
+                        (not rerisk_increase_only or target > pos)
+                        and abs(target - pos) > rerisk_inertia * abs(pos)
+                    )
+                    if should_update:
+                        pos = target
         elif pos < 0.0:
+            old_trough = trough
             trough = min(trough, c[t])
             if (not np.isnan(atr_t) and c[t] >= trough + stop_atr * atr_t) or sx[t]:
                 pos, exited = 0.0, True
+            elif rerisk and not np.isnan(atr_t) and atr_t > 0.0 and trough < old_trough:
+                stop = trough + stop_atr * atr_t
+                stop_dist = stop - c[t]
+                if stop_dist > 0.0:
+                    target = min(risk_pct * c[t] / stop_dist, cap)
+                    should_update = (
+                        (not rerisk_increase_only or target > abs(pos))
+                        and abs(target - abs(pos)) > rerisk_inertia * abs(pos)
+                    )
+                    if should_update:
+                        pos = -target
 
         if pos == 0.0 and not exited and not np.isnan(atr_t) and atr_t > 0.0:
             size = min(risk_pct * c[t] / (stop_atr * atr_t), cap)
@@ -120,7 +189,7 @@ def target_exposure(df: pd.DataFrame, params: dict, bars_per_day: float) -> pd.S
                 pos, peak = size, c[t]
             elif allow_short and se[t]:
                 pos, trough = -size, c[t]
-        exposure[t] = pos
+        exposure[t] = pos if pos != 0.0 else overlay[t]
     return pd.Series(exposure, index=sig["close"].index)
 
 

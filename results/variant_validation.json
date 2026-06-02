@@ -1,0 +1,203 @@
+{
+  "interval": "4h",
+  "candidate_params": {
+    "risk_pct_per_trade": 0.05,
+    "rerisk": true,
+    "rerisk_inertia": 0.1,
+    "bull_overlay": 0.5,
+    "bull_overlay_ma_days": 300,
+    "bull_overlay_ma_type": "ema",
+    "bull_overlay_vol_mult": true
+  },
+  "periods": {
+    "full": {
+      "strategy": {
+        "total_return": 45.3328322233073,
+        "cagr": 0.1939718807802968,
+        "volatility_annual": 0.18933696575263537,
+        "sharpe": 1.028991285002324,
+        "sortino": 1.1825663620825388,
+        "max_drawdown": -0.2469112947399692,
+        "calmar": 0.785593388850742,
+        "n_periods": 32959
+      },
+      "benchmark": {
+        "total_return": 11.739656070870243,
+        "cagr": 0.12480751850603644,
+        "volatility_annual": 0.1735337924748437,
+        "sharpe": 0.7642826197578884,
+        "sortino": 0.986945308840708,
+        "max_drawdown": -0.4509255385902531,
+        "calmar": 0.2767807716019529,
+        "n_periods": 32959
+      },
+      "strategy_final": 463328.322233073,
+      "benchmark_final": 127396.56070870243,
+      "strategy_total": 45.3328322233073,
+      "benchmark_total": 11.739656070870243,
+      "excess_cagr": 0.06916436227426037,
+      "excess_total": 33.59317615243705
+    },
+    "pre2013": {
+      "strategy": {
+        "total_return": 4.249456683848472,
+        "cagr": 0.1895141147979933,
+        "volatility_annual": 0.1843877443075881,
+        "sharpe": 1.0335181780641762,
+        "sortino": 1.0861948998774915,
+        "max_drawdown": -0.2469112947399692,
+        "calmar": 0.7675392695080115,
+        "n_periods": 14504
+      },
+      "benchmark": {
+        "total_return": 2.148150078165711,
+        "cagr": 0.1275301471351744,
+        "volatility_annual": 0.197909076571838,
+        "sharpe": 0.7054957042645205,
+        "sortino": 0.8816578692615376,
+        "max_drawdown": -0.3813637314369379,
+        "calmar": 0.33440554678509776,
+        "n_periods": 14504
+      },
+      "strategy_final": 52494.56683848472,
+      "benchmark_final": 31481.500781657112,
+      "strategy_total": 4.249456683848472,
+      "benchmark_total": 2.148150078165711,
+      "excess_cagr": 0.061983967662818884,
+      "excess_total": 2.1013066056827614
+    },
+    "post2013": {
+      "strategy": {
+        "total_return": 7.96867585927593,
+        "cagr": 0.19920747666065242,
+        "volatility_annual": 0.19316002398918233,
+        "sharpe": 1.0333881542339662,
+        "sortino": 1.2816770674643212,
+        "max_drawdown": -0.24478664163712538,
+        "calmar": 0.8138004399601182,
+        "n_periods": 18454
+      },
+      "benchmark": {
+        "total_return": 3.0034389021714203,
+        "cagr": 0.12172602185385584,
+        "volatility_annual": 0.15151884599919985,
+        "sharpe": 0.8333394777673826,
+        "sortino": 1.1441039685724685,
+        "max_drawdown": -0.24176451049203518,
+        "calmar": 0.5034900350184609,
+        "n_periods": 18454
+      },
+      "strategy_final": 463328.322233073,
+      "benchmark_final": 127396.56070870243,
+      "strategy_total": 7.96867585927593,
+      "benchmark_total": 3.0034389021714203,
+      "excess_cagr": 0.07748145480679658,
+      "excess_total": 4.965236957104509
+    }
+  },
+  "cost3_sharpe": 0.9974845793809659,
+  "benchmark_sharpe": 0.7642826197578884,
+  "walk_forward": {
+    "oos_cagr": 0.14954570362958108,
+    "oos_sharpe": 0.8217626230769063,
+    "oos_maxdd": -0.3027956212563039,
+    "bh_oos_cagr": 0.07413887339250036,
+    "bh_oos_sharpe": 0.5468733380850143,
+    "bh_oos_maxdd": -0.4146878483834999,
+    "dsr": 0.9993641607126789,
+    "trial_count": 33,
+    "picks": [
+      {
+        "train": [
+          "2006-01-01",
+          "2011-12-31"
+        ],
+        "test": [
+          "2012-01-01",
+          "2013-12-31"
+        ],
+        "pick": "rerisk_i10_overlay_0.75x_ema300_volmult"
+      },
+      {
+        "train": [
+          "2008-01-01",
+          "2013-12-31"
+        ],
+        "test": [
+          "2014-01-01",
+          "2015-12-31"
+        ],
+        "pick": "rerisk_i10_overlay_0.75x_ema200_volmult"
+      },
+      {
+        "train": [
+          "2010-01-01",
+          "2015-12-31"
+        ],
+        "test": [
+          "2016-01-01",
+          "2017-12-31"
+        ],
+        "pick": "rerisk_i25_overlay_0.75x_ema300_volmult"
+      },
+      {
+        "train": [
+          "2012-01-01",
+          "2017-12-31"
+        ],
+        "test": [
+          "2018-01-01",
+          "2019-12-31"
+        ],
+        "pick": "rerisk_i25_overlay_0.25x_ema300_plain"
+      },
+      {
+        "train": [
+          "2014-01-01",
+          "2019-12-31"
+        ],
+        "test": [
+          "2020-01-01",
+          "2021-12-31"
+        ],
+        "pick": "rerisk_i10_overlay_0.75x_ema300_plain"
+      },
+      {
+        "train": [
+          "2016-01-01",
+          "2021-12-31"
+        ],
+        "test": [
+          "2022-01-01",
+          "2023-12-31"
+        ],
+        "pick": "rerisk_i10_overlay_0.25x_ema300_plain"
+      },
+      {
+        "train": [
+          "2018-01-01",
+          "2023-12-31"
+        ],
+        "test": [
+          "2024-01-01",
+          "2025-12-31"
+        ],
+        "pick": "rerisk_i10_overlay_0.25x_ema300_plain"
+      }
+    ]
+  },
+  "mcpt": {
+    "obs_sharpe": 0.937801352985912,
+    "p_value": 0.001996007984031936,
+    "n_perm": 500
+  },
+  "checks": {
+    "wf_beats_bh": true,
+    "oos_dd_le_bh": true,
+    "dsr_gt_0p95": true,
+    "cost3_beats_bh": true,
+    "mcpt_p_lt_0p05": true
+  },
+  "n_pass": 5,
+  "all_pass": true
+}

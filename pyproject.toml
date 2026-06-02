@@ -1,7 +1,7 @@
 [project]
 name = "leveraged-gold-trend"
 version = "1.0.0"
-description = "A leveraged trend-following strategy on gold (XAUUSD), and a study of how the same strategy behaves across timeframes — and how trading costs kill the fast ones."
+description = "A governed-leverage gold trend strategy with a volatility-scaled bull overlay, and a study of how the same strategy behaves across timeframes — and how trading costs damage the fast ones."
 authors = [{ name = "Victor Noleto" }]
 readme = "README.md"
 license = { text = "MIT" }
