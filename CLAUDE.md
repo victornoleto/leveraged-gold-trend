@@ -14,7 +14,7 @@ returns-based (numpy/pandas/scipy only).
 Entry: Donchian breakout (new 55-day high → long; new 100-day low → short). Exit: ATR Chandelier
 trailing stop (5×ATR, 20-day ATR) — **no take-profit** (let winners run). Sizing: **risk-per-trade**
 — notional set so distance-to-stop = `risk_pct` of equity, with a **hard leverage cap** (3×).
-Leverage is *governed risk*, never a "make more money" dial (over-betting → ruin; Vince/Kelly).
+Leverage is _governed risk_, never a "make more money" dial (over-betting → ruin; Vince/Kelly).
 Long **and** short, so it's weakly correlated to gold itself.
 
 ## Key results
@@ -32,7 +32,7 @@ Deps already exist in the sibling quant venv — quickest path (data is already 
 gitignored, so reruns work offline):
 
 ```bash
-/var/www/victor/finances/quant/.venv/bin/python -m leveraged_gold_trend --interval 4h     # headline
+.venv/bin/python -m leveraged_gold_trend --interval 4h     # headline
 #   --validate  → the 5 gates   ·   --scan → 9-TF table (~2 min)   ·   --plots → regen charts
 ```
 
@@ -53,13 +53,13 @@ Clean-room (as a public user would): create a venv, `pip install -e .`, then
 - **Data is never committed** (1m parquet ≈ 100 MB; `.gitignore` excludes `data/*.parquet`).
   Precomputed evidence under `results/` **is** committed.
 - Shipped strategy is **Approach A**. B (naked vol-target leverage, blew up −64% DD) and C (regime
-  filter ≈ A) are *documented* in the README, not runnable here.
+  filter ≈ A) are _documented_ in the README, not runnable here.
 
 ## Layout
 
 `leveraged_gold_trend/`: `strategy.py` (the state machine), `data.py` (parquet load+resample,
 cached), `costs.py`, `metrics.py`, `validate.py` (the 5 gates), `timeframe_scan.py`, `plots.py`,
-`__main__.py` (CLI). `scripts/download_data.py` (Kaggle fetch). `results/` (CSV, JSON, 2 PNGs).
+`__main__.py` (CLI). `scripts/download_data.py` (Kaggle fetch). `results/` (CSV, JSON, 7 PNGs).
 
 ## State
 
