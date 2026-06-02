@@ -1,0 +1,14 @@
+{
+  "total_return": 24.2282,
+  "cagr": 0.1609,
+  "volatility_annual": 0.188,
+  "sharpe": 0.8846,
+  "sortino": 0.6854,
+  "max_drawdown": -0.2617,
+  "calmar": 0.6147,
+  "n_periods": 32959,
+  "n_trades": 112,
+  "avg_leverage": 2.0362540317332045,
+  "max_leverage": 3.0,
+  "pct_time_in_market": 0.27848907766990294
+}

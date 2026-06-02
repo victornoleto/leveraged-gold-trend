@@ -1,0 +1,28 @@
+[project]
+name = "leveraged-gold-trend"
+version = "1.0.0"
+description = "A leveraged trend-following strategy on gold (XAUUSD), and a study of how the same strategy behaves across timeframes — and how trading costs kill the fast ones."
+authors = [{ name = "Victor Noleto" }]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",     # deflated Sharpe + permutation test
+    "pyarrow>=14.0",   # read parquet
+    "matplotlib>=3.7", # plots
+]
+
+[project.optional-dependencies]
+download = ["kaggle>=1.6"]  # only needed to fetch the raw data
+
+[project.scripts]
+leveraged-gold-trend = "leveraged_gold_trend.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["leveraged_gold_trend"]
